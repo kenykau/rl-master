@@ -37,32 +37,6 @@ def calculate_fractal(df: pd.DataFrame) -> pd.DataFrame:
 
     return df
 
-
-
-# Get the current working directory (project path)
-project_path = os.getcwd()
-
-# Join the project path, data folder, and CSV file name
-file_name = 'USA30IDXUSD.csv'
-data_folder = 'data'
-file_path = os.path.join(project_path, data_folder, file_name)
-
-# Read the CSV file and create a DataFrame
-dataframe = read_csv_to_dataframe(file_path)
-dataframe = calculate_fractal(dataframe)
-
-fractal_df = dataframe[dataframe['Fractal']!=0].copy()
-
-filtered_df_2 = fractal_df[fractal_df['Fractal'] == 2]
-
-upper_fractal_df = dataframe[dataframe['UpperFractal']].copy()
-lower_fractal_df = dataframe[dataframe['LowerFractal']].copy()
-import pandas as pd
-
-import pandas as pd
-
-import pandas as pd
-
 def Compute(raw: pd.DataFrame, fractal: pd.DataFrame, n: int, idx: int):
     if idx <= 2:
         return None
@@ -70,32 +44,42 @@ def Compute(raw: pd.DataFrame, fractal: pd.DataFrame, n: int, idx: int):
     current_row = raw.iloc[idx]
     current_index = raw.index[idx - 2]
 
-    # 找到最接近的Fractal索引，但必须小于current_index
+    # Find the closest Fractal index, but must be less than current_index
     last_fractal = fractal[fractal.index < current_index].iloc[-1]
 
     if last_fractal.empty:
         return None
 
-    # 从Fractal中获取n行数据
+    # Get n rows of data from Fractal
     n_rows = fractal.loc[:last_fractal.name].iloc[-n:]
 
-    # 如果数据不足n行，返回None
+    # If the data is less than n rows, return None
     if len(n_rows) < n:
         return None
 
-    # 创建名为row0和row1的变量
+    # Create variables named row0 and row1
     row0 = raw.loc[n_rows.index[0]]
     row1 = raw.loc[n_rows.index[-1]]
 
-    # 计算row0和row1之间的行数（包括row0和row1）
+    # Calculate the number of rows between row0 and row1 (including row0 and row1)
     n_bars = len(raw.loc[row0.name:row1.name])
 
-    # 存储row0和row1之间的所有行（包括row0和row1）
+    # Store all rows between row0 and row1 (including row0 and row1)
     bars = raw.loc[row0.name:row1.name]
 
-    Calculate(bars, 'High')
+    # Call the Calculate function and store the returned values in variables
+    slope, intercept, line, std_dev = Calculate(bars, 'High')
 
-    return n, last_fractal, row0, row1, n_bars, bars
+    # Calculate the position of current_row relative to bars DataFrame
+    current_row_position = raw.index.get_loc(current_row.name) - raw.index.get_loc(bars.index[0])
+
+
+    # Predict the value of current_row using the linear regression line
+    predicted_value = slope * current_row_position + intercept
+
+    # Add the line and std_dev variables to the return statement
+    return n, last_fractal, row0, row1, n_bars, bars, predicted_value
+
 
 
 def Calculate(bars: pd.DataFrame, appliedPrice: str):
@@ -118,9 +102,27 @@ def Calculate(bars: pd.DataFrame, appliedPrice: str):
     # Compute standard deviation
     std_dev = np.std(data)
 
-    return line, std_dev
+    return lr.coef_[0][0], lr.intercept_[0], line, std_dev
+
+def prepare_data(data_folder: str, file_name: str):
+    project_path = os.getcwd()
+    file_path = os.path.join(project_path, data_folder, file_name)
+
+    dataframe = read_csv_to_dataframe(file_path)
+    dataframe = calculate_fractal(dataframe)
+
+    fractal_df = dataframe[dataframe['Fractal'] != 0].copy()
+    filtered_df_2 = fractal_df[fractal_df['Fractal'] == 2]
+
+    upper_fractal_df = dataframe[dataframe['UpperFractal']].copy()
+    lower_fractal_df = dataframe[dataframe['LowerFractal']].copy()
+
+    print(upper_fractal_df.head(10))
+    print(dataframe.head(100))
+    Compute(dataframe, upper_fractal_df, 3, 26)
 
 
-print(upper_fractal_df.head(10))
-print(dataframe.head(100))
-Compute(dataframe, upper_fractal_df, 3, 26)
+if __name__ == '__main__':
+    data_folder = 'data'
+    file_name = 'USA30IDXUSD.csv'
+    prepare_data(data_folder, file_name)
